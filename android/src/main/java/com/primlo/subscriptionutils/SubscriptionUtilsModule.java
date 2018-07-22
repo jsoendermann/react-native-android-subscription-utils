@@ -159,7 +159,7 @@ public class SubscriptionUtilsModule extends ReactContextBaseJavaModule implemen
     WritableMap ret = Arguments.createMap();
     ret.putString("responseCode", billingResponseToString(responseCode));
 
-    if (purchases != null) {
+    if (purchases == null) {
       ret.putNull("purchases");
     } else {
       WritableArray purchasesArray = Arguments.createArray();
