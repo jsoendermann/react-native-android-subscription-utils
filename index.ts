@@ -36,19 +36,20 @@ const subscribeToEvent = (
   )
 }
 
-export type BillingResponse =
-  | 'BILLING_UNAVAILABLE'
-  | 'DEVELOPER_ERROR'
-  | 'ERROR'
-  | 'FEATURE_NOT_SUPPORTED'
-  | 'ITEM_ALREADY_OWNED'
-  | 'ITEM_NOT_OWNED'
-  | 'ITEM_UNAVAILABLE'
-  | 'OK'
-  | 'SERVICE_DISCONNECTED'
-  | 'SERVICE_UNAVAILABLE'
-  | 'USER_CANCELED'
-  | 'UNKNOWN_BILLING_RESPONSE'
+export enum BillingResponse {
+  BILLING_UNAVAILABLE = 'BILLING_UNAVAILABLE',
+  DEVELOPER_ERROR = 'DEVELOPER_ERROR',
+  ERROR = 'ERROR',
+  FEATURE_NOT_SUPPORTED = 'FEATURE_NOT_SUPPORTED',
+  ITEM_ALREADY_OWNED = 'ITEM_ALREADY_OWNED',
+  ITEM_NOT_OWNED = 'ITEM_NOT_OWNED',
+  ITEM_UNAVAILABLE = 'ITEM_UNAVAILABLE',
+  OK = 'OK',
+  SERVICE_DISCONNECTED = 'SERVICE_DISCONNECTED',
+  SERVICE_UNAVAILABLE = 'SERVICE_UNAVAILABLE',
+  USER_CANCELED = 'USER_CANCELED',
+  UNKNOWN_BILLING_RESPONSE = 'UNKNOWN_BILLING_RESPONSE',
+}
 
 /**
  * Use this function to connect to the play store. The connection attempt was successful if the promise resolves to BillingResponse.OK. Make sure you subscribe to disconnect events using subscribeToDisconnect before calling this function.
