@@ -1,6 +1,6 @@
 {
   "name": "react-native-subscription-utils-android",
-  "version": "0.0.39",
+  "version": "1.0.0",
   "main": "index.js",
   "author": "Jan Soendermann <jan.soendermann+git@gmail.com>",
   "license": "Apache-2.0",

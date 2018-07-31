@@ -36,18 +36,50 @@ const subscribeToEvent = (
   )
 }
 
-export const connect: () => Promise<null> = getNativeFunction('connect')
+export type BillingResponse =
+  | 'BILLING_UNAVAILABLE'
+  | 'DEVELOPER_ERROR'
+  | 'ERROR'
+  | 'FEATURE_NOT_SUPPORTED'
+  | 'ITEM_ALREADY_OWNED'
+  | 'ITEM_NOT_OWNED'
+  | 'ITEM_UNAVAILABLE'
+  | 'OK'
+  | 'SERVICE_DISCONNECTED'
+  | 'SERVICE_UNAVAILABLE'
+  | 'USER_CANCELED'
+  | 'UNKNOWN_BILLING_RESPONSE'
 
+/**
+ * Use this function to connect to the play store. The connection attempt was successful if the promise resolves to BillingResponse.OK. Make sure you subscribe to disconnect events using subscribeToDisconnect before calling this function.
+ */
+export const connect: () => Promise<BillingResponse> = getNativeFunction(
+  'connect',
+)
+
+/**
+ * Disconnects from the play store. You probably want to call this when you dismiss your subscriptions screen.
+ */
 export const disconnect: () => Promise<null> = getNativeFunction('disconnect')
 
+/**
+ * This function is used to listen to disconnect events.
+ * @param callback You might try to reconnect using the connect function in this callback.
+ */
 export const subscribeToDisconnect = (
   callback: () => void,
 ): EmitterSubscription => subscribeToEvent(EVENT_CONNECTION_LOST, callback)
 
+/**
+ * It's not clear from the docs when this function is supposed to be called.
+ */
 export const isReady: () => Promise<boolean> = getNativeFunction('isReady')
 
 export type Feature = 'SUBSCRIPTIONS' | 'SUBSCRIPTIONS_UPDATE'
 
+/**
+ * It's probably a good idea to call this function to make sure the user's phone supports subscriptions.
+ */
 export const isFeatureSupported: (
   feature: Feature,
 ) => Promise<boolean> = getNativeFunction('isFeatureSupported')
@@ -69,6 +101,9 @@ export interface SkuDetails {
   type: string
 }
 
+/**
+ * Use this function to get details for the given SKUs. Getting the SKUs in the first place is your responsibility.
+ */
 export const querySkuDetails: (
   skus: string[],
 ) => Promise<SkuDetails[]> = getNativeFunction('querySkuDetails')
@@ -78,23 +113,12 @@ export interface LaunchBillingFlowParams {
   oldSku?: string
   accountId?: string
 }
+/**
+ * This launches the sequence of dialogues that are shown to the user to complete a purchase. Make sure you call subscribeToPurchasesUpdated before you call this function.
+ */
 export const launchBillingFlow: (
   params: LaunchBillingFlowParams,
-) => Promise<void> = getNativeFunction('launchBillingFlow')
-
-export type BillingResponse =
-  | 'BILLING_UNAVAILABLE'
-  | 'DEVELOPER_ERROR'
-  | 'ERROR'
-  | 'FEATURE_NOT_SUPPORTED'
-  | 'ITEM_ALREADY_OWNED'
-  | 'ITEM_NOT_OWNED'
-  | 'ITEM_UNAVAILABLE'
-  | 'OK'
-  | 'SERVICE_DISCONNECTED'
-  | 'SERVICE_UNAVAILABLE'
-  | 'USER_CANCELED'
-  | 'UNKNOWN_BILLING_RESPONSE'
+) => Promise<BillingResponse> = getNativeFunction('launchBillingFlow')
 
 export interface PurchasesData {
   billingResponse: BillingResponse
@@ -116,11 +140,7 @@ export const subscribeToPurchasesUpdated = (
 ): EmitterSubscription => subscribeToEvent(EVENT_PURCHASE_UPDATED, callback)
 
 /**
- * Call queryPurchases() at least twice in your code:
-
-    Every time your app launches so that you can restore any purchases that a user has made since the app last stopped.
-    In your onResume() method because a user can make a purchase when your app is in the background (for example, redeeming a promo code in Play Store app).
-
+ * Google recommends calling this on app launch and when returning from background to catch up with subscription status changes that may have happened while the app wasn't active.
  */
 export const queryPurchases: () => Promise<PurchasesData> = getNativeFunction(
   'queryPurchases',

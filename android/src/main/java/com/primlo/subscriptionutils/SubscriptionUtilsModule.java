@@ -63,11 +63,7 @@ public class SubscriptionUtilsModule extends ReactContextBaseJavaModule implemen
     mBillingClient.startConnection(new BillingClientStateListener() {
       @Override
       public void onBillingSetupFinished(@BillingResponse int billingResponseCode) {
-        if (billingResponseCode == BillingResponse.OK) {
-          promise.resolve(null);
-        } else {
-          promise.reject(ERR_CONNECTION_ERROR, billingResponseToString(billingResponseCode));
-        }
+        promise.resolve(billingResponseToString(billingResponseCode));
       }
 
       @Override
@@ -92,19 +88,20 @@ public class SubscriptionUtilsModule extends ReactContextBaseJavaModule implemen
   public void isFeatureSupported(String feature, Promise promise) {
     switch (feature) {
     case "SUBSCRIPTIONS": {
-      boolean isSupported = mBillingClient.isFeatureSupported(BillingClient.FeatureType.SUBSCRIPTIONS);
-      promise.resolve(isSupported);
+      int result = mBillingClient.isFeatureSupported(BillingClient.FeatureType.SUBSCRIPTIONS);
+      promise.resolve(billingResponseToString(result));
       break;
     }
 
     case "SUBSCRIPTIONS_UPDATE": {
-      boolean isSupported = mBillingClient.isFeatureSupported(BillingClient.FeatureType.SUBSCRIPTIONS_UPDATE);
-      promise.resolve(isSupported);
+      int result = mBillingClient.isFeatureSupported(BillingClient.FeatureType.SUBSCRIPTIONS_UPDATE);
+      promise.resolve(billingResponseToString(result));
       break;
     }
 
     default:
-      promise.reject(ERR_UNRECOGNIZED_FEATURE, null);
+      promise.reject(ERR_UNRECOGNIZED_FEATURE, feature);
+      break;
     }
   }
 
@@ -152,7 +149,7 @@ public class SubscriptionUtilsModule extends ReactContextBaseJavaModule implemen
       @Override
       public void run() {
         if (!params.hasKey("sku")) {
-          promise.reject(ERR_MISSING_SKU, null);
+          promise.reject(ERR_MISSING_SKU, "You need to set the sku of the product to be purchased.");
         }
         String sku = params.getString("sku");
 
@@ -171,11 +168,7 @@ public class SubscriptionUtilsModule extends ReactContextBaseJavaModule implemen
         BillingFlowParams flowParams = builder.setType(SkuType.SUBS).build();
         int responseCode = mBillingClient.launchBillingFlow(getCurrentActivity(), flowParams);
 
-        if (responseCode == BillingResponse.OK) {
-          promise.resolve(null);
-        } else {
-          promise.reject(ERR_COULD_NOT_LAUNCH_BILLING_FLOW, billingResponseToString(responseCode));
-        }
+        promise.resolve(billingResponseToString(responseCode));
       }
     };
 
@@ -193,8 +186,7 @@ public class SubscriptionUtilsModule extends ReactContextBaseJavaModule implemen
     PurchasesResult purchasesResult = mBillingClient.queryPurchases(SkuType.SUBS);
     int responseCode = purchasesResult.getResponseCode();
     List<Purchase> purchases = purchasesResult.getPurchasesList();
-    Log.d(TAG, "queryPurchases");
-    Log.d(TAG, purchases.toString());
+    // Log.d(TAG, "queryPurchases");
 
     if (responseCode == BillingResponse.OK) {
       WritableMap purchasesData = purchasesDataToMap(responseCode, purchases);
