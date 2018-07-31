@@ -1,0 +1,5 @@
+.gitignore
+index.ts
+tsconfig.json
+.idea
+android/.gradle

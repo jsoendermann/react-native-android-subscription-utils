@@ -1,10 +1,22 @@
 {
   "name": "react-native-subscription-utils-android",
-  "version": "0.0.32",
+  "version": "0.0.39",
   "main": "index.js",
   "author": "Jan Soendermann <jan.soendermann+git@gmail.com>",
   "license": "Apache-2.0",
+  "scripts": {
+    "build": "tsc --pretty",
+    "watch": "tsc --watch --pretty",
+    "lint": "tslint ./*.ts",
+    "prepare": "npm run build"
+  },
   "peerDependencies": {
     "react-native": "*"
+  },
+  "devDependencies": {
+    "@types/react-native": "*",
+    "tslint": "^5.11.0",
+    "tslint-config-prettier": "^1.14.0",
+    "typescript": "^3.0.1"
   }
 }

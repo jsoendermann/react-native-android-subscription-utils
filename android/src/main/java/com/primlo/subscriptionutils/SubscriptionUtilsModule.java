@@ -16,6 +16,7 @@ import com.android.billingclient.api.PurchasesUpdatedListener;
 import com.android.billingclient.api.SkuDetails;
 import com.android.billingclient.api.SkuDetailsParams;
 import com.android.billingclient.api.SkuDetailsResponseListener;
+import com.android.billingclient.api.PurchaseHistoryResponseListener;
 import com.facebook.react.bridge.Promise;
 import com.facebook.react.bridge.ReactContextBaseJavaModule;
 import com.facebook.react.bridge.ReactApplicationContext;
@@ -23,6 +24,7 @@ import com.facebook.react.bridge.ReactMethod;
 import com.facebook.react.bridge.Arguments;
 import com.facebook.react.bridge.ReadableArray;
 import com.facebook.react.bridge.WritableArray;
+import com.facebook.react.bridge.ReadableMap;
 import com.facebook.react.bridge.WritableMap;
 import com.facebook.react.ReactApplication;
 import com.facebook.react.ReactNativeHost;
@@ -34,9 +36,12 @@ public class SubscriptionUtilsModule extends ReactContextBaseJavaModule implemen
   private static final String TAG = "SubscriptionUtils";
 
   private static final String ERR_CONNECTION_ERROR = "ERR_CONNECTION_ERROR";
+  private static final String ERR_UNRECOGNIZED_FEATURE = "ERR_UNRECOGNIZED_FEATURE";
   private static final String ERR_COULD_NOT_LOAD_PRODUCTS = "ERR_COULD_NOT_LOAD_PRODUCTS";
+  private static final String ERR_MISSING_SKU = "ERR_MISSING_SKU";
   private static final String ERR_COULD_NOT_LAUNCH_BILLING_FLOW = "ERR_COULD_NOT_LAUNCH_BILLING_FLOW";
   private static final String ERR_COULD_NOT_QUERY_PURCHASES = "ERR_COULD_NOT_QUERY_PURCHASES";
+  private static final String ERR_COULD_NOT_QUERY_PURCHASES_ASYNC = "ERR_COULD_NOT_QUERY_PURCHASES_ASYNC";
 
   private static final String EVENT_CONNECTION_LOST = "com.primlo.subscripiton-utils.android.connection-lost";
   private static final String EVENT_PURCHASE_UPDATED = "com.primlo.subscripiton-utils.android.purchase-updated";
@@ -52,14 +57,10 @@ public class SubscriptionUtilsModule extends ReactContextBaseJavaModule implemen
     return "SubscriptionUtils";
   }
 
-  private void sendEvent(String eventName, WritableMap params) {
-    getReactApplicationContext().getJSModule(RCTNativeAppEventEmitter.class).emit(eventName, params);
-  }
-
   @ReactMethod
   public void connect(final Promise promise) {
-    this.mBillingClient = BillingClient.newBuilder(getCurrentActivity()).setListener(this).build();
-    this.mBillingClient.startConnection(new BillingClientStateListener() {
+    mBillingClient = BillingClient.newBuilder(getCurrentActivity()).setListener(this).build();
+    mBillingClient.startConnection(new BillingClientStateListener() {
       @Override
       public void onBillingSetupFinished(@BillingResponse int billingResponseCode) {
         if (billingResponseCode == BillingResponse.OK) {
@@ -77,7 +78,38 @@ public class SubscriptionUtilsModule extends ReactContextBaseJavaModule implemen
   }
 
   @ReactMethod
-  public void loadProducts(ReadableArray jsSkuList, final Promise promise) {
+  public void disconnect(final Promise promise) {
+    mBillingClient.endConnection();
+    promise.resolve(null);
+  }
+
+  @ReactMethod
+  public void isReady(final Promise promise) {
+    promise.resolve(mBillingClient.isReady());
+  }
+
+  @ReactMethod
+  public void isFeatureSupported(String feature, Promise promise) {
+    switch (feature) {
+    case "SUBSCRIPTIONS": {
+      boolean isSupported = mBillingClient.isFeatureSupported(BillingClient.FeatureType.SUBSCRIPTIONS);
+      promise.resolve(isSupported);
+      break;
+    }
+
+    case "SUBSCRIPTIONS_UPDATE": {
+      boolean isSupported = mBillingClient.isFeatureSupported(BillingClient.FeatureType.SUBSCRIPTIONS_UPDATE);
+      promise.resolve(isSupported);
+      break;
+    }
+
+    default:
+      promise.reject(ERR_UNRECOGNIZED_FEATURE, null);
+    }
+  }
+
+  @ReactMethod
+  public void querySkuDetails(ReadableArray jsSkuList, final Promise promise) {
     List skuList = new ArrayList<>();
     for (int i = 0; i < jsSkuList.size(); i++) {
       skuList.add(jsSkuList.getString(i));
@@ -115,13 +147,28 @@ public class SubscriptionUtilsModule extends ReactContextBaseJavaModule implemen
   }
 
   @ReactMethod
-  public void launchBillingFlow(final String skuId, final Promise promise) {
+  public void launchBillingFlow(final ReadableMap params, final Promise promise) {
     Runnable purchaseFlowRequest = new Runnable() {
       @Override
       public void run() {
-        // Log.d(TAG, "Launching billing flow.");
+        if (!params.hasKey("sku")) {
+          promise.reject(ERR_MISSING_SKU, null);
+        }
+        String sku = params.getString("sku");
 
-        BillingFlowParams flowParams = BillingFlowParams.newBuilder().setSku(skuId).setType(SkuType.SUBS).build();
+        BillingFlowParams.Builder builder = BillingFlowParams.newBuilder().setSku(sku);
+
+        if (params.hasKey("oldSku")) {
+          String oldSku = params.getString("oldSku");
+          builder.setOldSku(oldSku);
+        }
+
+        if (params.hasKey("accountId")) {
+          String accountId = params.getString("accountId");
+          builder.setAccountId(accountId);
+        }
+
+        BillingFlowParams flowParams = builder.setType(SkuType.SUBS).build();
         int responseCode = mBillingClient.launchBillingFlow(getCurrentActivity(), flowParams);
 
         if (responseCode == BillingResponse.OK) {
@@ -137,8 +184,8 @@ public class SubscriptionUtilsModule extends ReactContextBaseJavaModule implemen
 
   @Override
   public void onPurchasesUpdated(@BillingResponse int responseCode, List<Purchase> purchases) {
-    WritableMap purchaseData = purchaseDataToMap(responseCode, purchases);
-    sendEvent(EVENT_PURCHASE_UPDATED, purchaseData);
+    WritableMap purchasesData = purchasesDataToMap(responseCode, purchases);
+    sendEvent(EVENT_PURCHASE_UPDATED, purchasesData);
   }
 
   @ReactMethod
@@ -146,16 +193,37 @@ public class SubscriptionUtilsModule extends ReactContextBaseJavaModule implemen
     PurchasesResult purchasesResult = mBillingClient.queryPurchases(SkuType.SUBS);
     int responseCode = purchasesResult.getResponseCode();
     List<Purchase> purchases = purchasesResult.getPurchasesList();
+    Log.d(TAG, "queryPurchases");
+    Log.d(TAG, purchases.toString());
 
     if (responseCode == BillingResponse.OK) {
-      WritableMap purchaseData = purchaseDataToMap(responseCode, purchases);
-      promise.resolve(purchaseData);
+      WritableMap purchasesData = purchasesDataToMap(responseCode, purchases);
+      promise.resolve(purchasesData);
     } else {
       promise.reject(ERR_COULD_NOT_QUERY_PURCHASES, billingResponseToString(responseCode));
     }
   }
 
-  private static WritableMap purchaseDataToMap(@BillingResponse int responseCode, List<Purchase> purchases) {
+  @ReactMethod
+  public void queryPurchaseHistoryAsync(final Promise promise) {
+    mBillingClient.queryPurchaseHistoryAsync(SkuType.INAPP, new PurchaseHistoryResponseListener() {
+      @Override
+      public void onPurchaseHistoryResponse(@BillingResponse int responseCode, List<Purchase> purchases) {
+        if (responseCode == BillingResponse.OK) {
+          WritableMap purchasesData = purchasesDataToMap(responseCode, purchases);
+          promise.resolve(purchasesData);
+        } else {
+          promise.reject(ERR_COULD_NOT_QUERY_PURCHASES_ASYNC, billingResponseToString(responseCode));
+        }
+      }
+    });
+  }
+
+  private void sendEvent(String eventName, WritableMap params) {
+    getReactApplicationContext().getJSModule(RCTNativeAppEventEmitter.class).emit(eventName, params);
+  }
+
+  private static WritableMap purchasesDataToMap(@BillingResponse int responseCode, List<Purchase> purchases) {
     WritableMap ret = Arguments.createMap();
     ret.putString("responseCode", billingResponseToString(responseCode));
 
